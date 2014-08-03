@@ -4,6 +4,8 @@ var express = require('express');
 var fs = require('fs');
 
 var app = express();
+app.use(express.static(__dirname + '/client'));
+
 
 // use these environment variables or pull from config file
 nconf.env(['PORT'])
