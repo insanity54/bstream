@@ -1,0 +1,182 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<title>Device Switching</title>
+<style>
+video {
+    border:5px solid black;
+    width:480px;
+    height:360px;
+}
+button {
+    font: 18px sans-serif;
+    padding: 8px;
+}
+</style>
+<script>
+
+var activeCam = {};       // object for the camera being streamed
+var scanCam = {};          // counter for the camera having its preview generated
+var scanInterval = 3000;  // scan cameras for snapshots every this milliseconds
+var initDelay = 800;
+
+var mainStream;
+var nextCam = 0;
+var sourceIDs = new Array();
+</script>
+</head>
+<body onload="start()">
+<button id="btn" onclick="another()">Please may I have another?</button>
+<button id="snap" onclick="snapshot()">snapshot</button>
+<canvas id="pic"></canvas>
+<div id="previews">
+  <!-- camera preview images go here -->
+</div>
+<br>
+
+<script>
+
+
+function failure(e) {
+  console.log("Failure");
+  alert(e.name)
+}
+
+function start() {
+
+    // make sure browser is supported
+    navigator.getUserMedia = ( navigator.getUserMedia ||
+			       navigator.webkitGetUserMedia ||
+			       navigator.mozGetUserMedia ||
+			       navigator.msGetUserMedia );
+
+    if (!navigator.getUserMedia) throw new Error('browser does not support getUserMedia.');
+    if (!MediaStreamTrack.getSources) throw new Error('Browser does not support MediaStreamTrack.getsources(). Try Chrome.');
+
+    // get video sources connected to this machine
+    discoverCams();
+
+    // display the first detected camera
+    scanCams();
+    
+}
+
+function discoverCams() {
+  
+    // get audio and video sources connected to this machine
+    MediaStreamTrack.getSources(function(sourceInfos) {
+
+	var storageIndex = 0;
+	
+	// iterate through each found source and add the videos to an array
+	for (var i=0; i < sourceInfos.length; i++) {
+            console.log(sourceInfos[i])
+            if (sourceInfos[i].kind == 'video') {
+		
+		// add the source to the array
+		sourceIDs.push(sourceInfos[i].id);
+		
+		// set the video to the display
+		//console.log('setting' +  sourceInfos[i].id);
+		//navigator.webkitGetUserMedia({ video: {optional: [{sourceId: sourceInfos[i].id}]}},
+		//    gotStream, function() {});
+		
+		//sourceIDs[storageIndex] = sourceInfos[i].id;
+		storageIndex++;
+            }
+	}
+    });
+}
+
+
+function gotStream(stream) {
+    console.log("Gotstream " + stream.id);
+    
+    // create new video element
+    var newvid = document.createElement('video');
+    
+    // set src of video element to stream and make it play
+    newvid.src = webkitURL.createObjectURL(stream);
+    newvid.autoplay = true;
+    
+    // add video element to previews div
+    previews.appendChild(newvid);
+    
+    // store reference to this video/stream in the activeCam object
+    activeCam.el = newvid;
+    activeCam.stream = stream;
+}
+
+function snapshot() {
+    console.log('snapshot func');
+    var video = activeCam.el;
+    //console.dir(video);
+    console.log('vid width:'+video.videoWidth+' vid height:'+video.videoHeight);
+    var canvas = document.getElementById("pic");
+
+    var ctx = canvas.getContext("2d");
+    ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight, 0, 0, 150, 84);
+}
+
+function scanCams() {
+    var scanTimer = setInterval(function() {
+	console.log('scanning camera ' + scanCam);
+	
+	// close stream to last camera
+	console.dir(activeCam.stream);
+	activeCam.stream.stop();
+	
+	// open stream from new camera
+	var stream = startStream(camToId(nextScanCam()));
+	
+	// wait for camera to init
+	// take snapshot
+	setTimeout(snapshot, initDelay);
+	
+
+    }, scanInterval);
+}				
+
+function startStream(id) {
+    navigator.getUserMedia({ video: {optional: [{sourceId: id}]}},
+			   gotStream,
+			   function(err) {console.log(err)});    
+}
+
+function nextScanCam() {
+    var totalCam = sourceIDs.length;
+    var next = nextCam + 1;
+
+    if (next > totalCam) {
+	return nextCam = 0;
+    } else {
+	return nextCam++;
+    }
+}
+
+function camToId(cam) {
+    return sourceIDs[cam];
+}
+
+function another() {
+    // set the video to the display
+    //console.log('setting' +  sourceInfos[i].id);
+    //console.log('adding: ' + sourceIDs[nextCam++]);
+    
+    navigator.getUserMedia({ video: {optional: [{sourceId: sourceIDs[nextCam++]}]}},
+			   gotStream,
+			   function(err) {console.log(err)});
+}
+
+function gotSources(sourceInfos) {
+}
+
+//video = document.getElementById("vid");
+previews = document.getElementById("previews");		    
+
+		      
+</script>
+</body>
+</html>
+
