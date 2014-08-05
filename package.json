@@ -13,6 +13,7 @@
     "mocha": "^1.21.3"
   },
   "dependencies": {
-    "express": "^4.7.2"
+    "express": "^4.7.2",
+    "mocha": "^1.21.3"
   }
 }
