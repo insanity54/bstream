@@ -4,9 +4,8 @@
   "description": "",
   "main": "app.js",
   "scripts": {
-    "preinstall": "npm i -g mocha",
     "start": "node app.js",
-    "test": "mocha test.js --reporter spec"
+    "test": "./node_modues/mocha/bin/mocha test.js --reporter spec"
   },
   "author": "Chris Grimmett <chris@grimtech.net>",
   "license": "MIT",
