@@ -26,7 +26,7 @@ var server = https.createServer(options, app);
 
 
 app.get('/', function(req, res) {
-    res.sendfile('client/index.html', {root: __dirname })
+    res.sendfile('client/test2.html', {root: __dirname})
 });
 
 
