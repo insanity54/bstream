@@ -13,24 +13,41 @@ button {
     font: 18px sans-serif;
     padding: 8px;
 }
+.pic {
+    border: 2px solid yellow;
+}
+.preview {
+    border: 3px dashed blue;
+}
+#scanner {
+    border: 1px dotted red;
+}
 </style>
 <script>
 
-var activeCam = {};       // object for the camera being streamed
-var scanCam = {};          // counter for the camera having its preview generated
-var scanInterval = 3000;  // scan cameras for snapshots every this milliseconds
-var initDelay = 800;
+//var cameras = [];         // array to hold all camera objects
+//var activeCam = {};       // object for the camera being streamed
+//var scanCam = {};         // counter for the camera having its preview generated
+//var scanInterval = 3000;  // scan cameras for snapshots every this milliseconds
+//var initDelay = 1000;
 
-var mainStream;
-var nextCam = 0;
-var sourceIDs = new Array();
+//var mainStream;
+//var nextCam = 0;
+//var sourceIDs = new Array();
+
 </script>
 </head>
 <body onload="start()">
 <button id="btn" onclick="another()">Please may I have another?</button>
 <button id="snap" onclick="snapshot()">snapshot</button>
-<canvas id="pic"></canvas>
+
+<div id="scanner"></div>
+
 <div id="previews">
+    <canvas class="pic" id="pic"></canvas>
+</div>
+
+<div id="live">
   <!-- camera preview images go here -->
 </div>
 <br>
@@ -55,36 +72,106 @@ function start() {
     if (!MediaStreamTrack.getSources) throw new Error('Browser does not support MediaStreamTrack.getsources(). Try Chrome.');
 
     // get video sources connected to this machine
-    discoverCams();
+    discoverCams(function(err, cameras) {
+	// In the previews section, display a placeholder box for each detected camera
 
-    // display the first detected camera
-    scanCams();
+	cameras.forEach(function(camera, i) {
+	    //ccc
+	    
+	    // get camera source id
+	    id = camera.id;
+
+	    // get camera stream
+	    startStream(id, function(stream) {
+
+		// create new video element (hidden);
+		var scanVid = document.createElement('video');
+		
+		// set src of video element to stream and make it play
+		scanVid.src = webkitURL.createObjectURL(stream);
+		scanVid.autoplay = true;
+		
+		// add video element to live div
+		scanner.appendChild(scanVid);
+		
+		// send snapshot to .preview + i
+		
+
+		// @todo get aspect ratio, scale preview thumbnail accordingly
+		
+		console.log('snapshot func');
+		
+		var id = 'preview' + i;
+		console.log('preview id: ' + id);
+		//var video = activeCam.el;
+		//console.dir(video);
+		//console.log('vid width:'+video.videoWidth+' vid height:'+video.videoHeight);
+		//var id = 'preview' + activeCam.el.id
+		//console.log('cam?' + id);
+		
+		var canvas = document.getElementById(id);
+		canvas.style.border='3px dashed red';
+
+		setTimeout(function() {
+		    
+		    var ctx = canvas.getContext("2d");
+		    ctx.drawImage(scanVid, 0, 0, 480, 360, 0, 0, 150, 84);
+
+		}, 1000);
+		
+		// close camera stream
+
+
+		
+	    });
+	    
+	    
+
+
+	    
+	    
+	    
+	    console.log('adding a preview for camera ' + i);
+	    preview = document.createElement('canvas');
+	    preview.setAttribute("class", "preview");
+	    preview.setAttribute("id", "preview" + i);
+	    previews.appendChild(preview);
+	});	
+    });
+
+
+
+    //scanCams();
+    
+
+    
     
 }
 
-function discoverCams() {
+function discoverCams(callback) {
   
     // get audio and video sources connected to this machine
-    MediaStreamTrack.getSources(function(sourceInfos) {
+    MediaStreamTrack.getSources(function(sources) {
 
-	var storageIndex = 0;
-	
+	var cameras = [];
+	var vidCount = 0;
 	// iterate through each found source and add the videos to an array
-	for (var i=0; i < sourceInfos.length; i++) {
-            console.log(sourceInfos[i])
-            if (sourceInfos[i].kind == 'video') {
+	for (var i=0; i < sources.length; i++) {
+            console.log(sources[i])
+            if (sources[i].kind == 'video') {
+		// the iterated source info is a video source
 		
-		// add the source to the array
-		sourceIDs.push(sourceInfos[i].id);
+		// add the source id to the cameras array
+		// and add a 'live' flag for use later
+		var obj = {};
+		obj['id'] = sources[i].id;
+		obj['live'] = 'false';
+		cameras.push(obj);
+		vidCount++;
 		
-		// set the video to the display
-		//console.log('setting' +  sourceInfos[i].id);
-		//navigator.webkitGetUserMedia({ video: {optional: [{sourceId: sourceInfos[i].id}]}},
-		//    gotStream, function() {});
-		
-		//sourceIDs[storageIndex] = sourceInfos[i].id;
-		storageIndex++;
             }
+	    // once all sources have been checked, callback with all the camera objects (containing video sources)
+	    if (i == sources.length-1) return callback(null, cameras);
 	}
     });
 }
@@ -100,23 +187,17 @@ function gotStream(stream) {
     newvid.src = webkitURL.createObjectURL(stream);
     newvid.autoplay = true;
     
-    // add video element to previews div
-    previews.appendChild(newvid);
+    // add video element to live div
+    live.appendChild(newvid);
     
     // store reference to this video/stream in the activeCam object
     activeCam.el = newvid;
     activeCam.stream = stream;
+    //activeCam.number 
 }
 
-function snapshot() {
-    console.log('snapshot func');
-    var video = activeCam.el;
-    //console.dir(video);
-    console.log('vid width:'+video.videoWidth+' vid height:'+video.videoHeight);
-    var canvas = document.getElementById("pic");
+function snapshot(camera) {
 
-    var ctx = canvas.getContext("2d");
-    ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight, 0, 0, 150, 84);
 }
 
 function scanCams() {
@@ -138,10 +219,10 @@ function scanCams() {
     }, scanInterval);
 }				
 
-function startStream(id) {
+function startStream(id, callback) {
     navigator.getUserMedia({ video: {optional: [{sourceId: id}]}},
-			   gotStream,
-			   function(err) {console.log(err)});    
+			   callback,
+			   function(err) { return console.log(err) });	    
 }
 
 function nextScanCam() {
@@ -155,9 +236,29 @@ function nextScanCam() {
     }
 }
 
+/**
+ * camToId
+ *
+ * Convenience function. Converts camera number to camera source ID
+ *
+ * @param {int} cam      The zero-indexed camera number out of all discovered cameras
+ * @return {String}      The camera source ID
+ */
 function camToId(cam) {
     return sourceIDs[cam];
 }
+/**
+ * idToCam
+ *
+ * Convenience function. Converts camera source ID to camera number
+ *
+ * @param {String} id    The unique camera source ID
+ * @return {int}         The zero-indexed camera number
+ */
+function idToCam(id) {
+    throw new Error('idk my bff jill');
+}
+
 
 function another() {
     // set the video to the display
@@ -173,9 +274,10 @@ function gotSources(sourceInfos) {
 }
 
 //video = document.getElementById("vid");
-previews = document.getElementById("previews");		    
+var live = document.getElementById("live");
+var scanner = document.getElementById("scanner");
+var previews = document.getElementById("previews");
 
-		      
 </script>
 </body>
 </html>
