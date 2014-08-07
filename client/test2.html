@@ -13,14 +13,12 @@ button {
     font: 18px sans-serif;
     padding: 8px;
 }
-.pic {
-    border: 2px solid yellow;
-}
 .preview {
-    border: 3px dashed blue;
+    border: 3px dotted blue;
 }
 #scanner {
     border: 1px dotted green;
+    display: none;
 }
 </style>
 <script type="text/javascript" src="js/async.js"></script>
@@ -39,17 +37,20 @@ var initDelay = 1000;
 </script>
 </head>
 <body onload="start()">
+<!--
 <button id="btn" onclick="another()">Please may I have another?</button>
 <button id="snap" onclick="snapshot()">snapshot</button>
+-->
 
 <div id="previews">
-    <canvas class="pic" id="pic"></canvas>
+    <p>Previews</p>
 </div>
 
 <div id="scanner"></div>
 
 <div id="live">
   <!-- camera preview images go here -->
+    <p>Live</p>
 </div>
 <br>
 
@@ -61,6 +62,26 @@ function failure(e) {
   alert(e.name)
 }
 
+function createPreview(camera, callback) {
+    
+    var camNum = camera.num;
+	
+    // In the previews section, display a placeholder box for each detected camera
+    preview = document.createElement('canvas');
+    preview.setAttribute('width', '150');
+    preview.setAttribute('height', '84');    
+    preview.setAttribute('class', 'preview');
+    preview.setAttribute('id', 'preview' + camNum);
+    previews.appendChild(preview);
+    return callback();
+	
+}
+
+function createPreviews(vs, callback) {
+    // for each camera, create a preview window
+    async.eachSeries(vs.cameras, createPreview, callback(null, vs));
+}
+	
 function start() {
 
     // make sure browser is supported
@@ -72,125 +93,18 @@ function start() {
     if (!navigator.getUserMedia) throw new Error('browser does not support getUserMedia.');
     if (!MediaStreamTrack.getSources) throw new Error('Browser does not support MediaStreamTrack.getsources(). Try Chrome.');
 
-    // get video sources connected to this machine
-    discoverCams(function(err, cameras) {
 
-	// for each camera, create a preview window
-	async.eachSeries(cameras, function(camera, callback) {
-
-	    var camNum = cameras.indexOf(camera);
-	    
-	    // In the previews section, display a placeholder box for each detected camera
-	    console.log('adding a preview for camera ' + camNum);
-	    preview = document.createElement('canvas');
-	    preview.setAttribute("class", "preview");
-	    preview.setAttribute("id", "preview" + camNum);
-	    previews.appendChild(preview);
-	    callback();
-	    
-	}, function() {
-	    // when all previews have been made
-
-
-	// for each camera
-	    // open stream,
-	    // add stream to video#live,
-	    // copy video frame to canvas#preview* (where * is camera index)
-	    // close stream
-	    
-	async.eachSeries(cameras, function(camera, callback) {
-	    
-	    //ccc
-	    
-	    // get camera source id
-	    id = camera.id;
-
-	    // get camera stream
-	    startStream(id, function(stream) {
-
-		// get scanner div
-		var scanDiv = document.getElementById('scanner');
-		
-		// create scanner video element
-		var scanVid = document.createElement('video');
-		
-		// set src of video element to camera stream
-		scanVid.src = webkitURL.createObjectURL(stream);
-		scanVid.autoplay = true;
-
-		// add video element to scanner
-		scanner.appendChild(scanVid);
-
-		var camNum = cameras.indexOf(camera);
-		var id = 'preview' + camNum;
-		
-		var canvas = document.getElementById(id);
-		console.log('getting canvas ' + canvas);
-		console.dir(canvas);
-		
-		// wait 1s for camera to init
-		setTimeout(function() {
-		    
-		    // send snapshot to .preview + i
-		    // @todo get aspect ratio, scale preview thumbnail accordingly				    
-		    
-		    console.log('snapshot func');
-
-		    canvas.style.border='3px dashed red';
-		    
-		    var ctx = canvas.getContext("2d");
-		    ctx.drawImage(scanVid, 0, 0, 480, 360, 0, 0, 150, 84);
-
-		    // close camera stream
-		    console.dir(stream);
-		    stream.stop();
-
-		    // remove the video element from the scanner div
-		    scanDiv.removeChild(scanVid);
-		    
-		    // the scan of this camera is finished
-		    callback();		    
-
-		}, initDelay);
-		    
-		
-		
-
-		
-
-
-		
-
-		//var video = activeCam.el;
-		//console.dir(video);
-		//console.log('vid width:'+video.videoWidth+' vid height:'+video.videoHeight);
-		//var id = 'preview' + activeCam.el.id
-		//console.log('cam?' + id);
-
-		
-
-		
-		// close camera stream
-
-
-
-	    });
-		
-	}, function(err) { 
-	    // When iteration done for all cameras
-	    
-	});
+    async.waterfall([
+	discoverCams,     // get video sources connected to this machine
+	createPreviews,   // for each video, create a preview canvas
+	//takeSnapshots,
+	scanLoop
+	//...
 	
-			
-	    
-	});	    
-
-
-	    
-	    
-	    
-
-    });	
+    ], function(err, results) {
+	console.log('waterfall done');
+	// called when all done, has all results of series functions
+    });	    
 }
 
 function discoverCams(callback) {
@@ -211,19 +125,25 @@ function discoverCams(callback) {
 		var obj = {};
 		obj['id'] = sources[i].id;
 		obj['live'] = 'false';
+		obj['num'] = vidCount;
 		cameras.push(obj);
 		vidCount++;
-		
+
             }
 	    // once all sources have been checked, callback with all the camera objects (containing video sources)
-	    if (i == sources.length-1) return callback(null, cameras);
+	    if (i == sources.length-1) {
+
+		if (!vs) var vs = {};  // create variables object used to hold all async.waterfall passed variables.
+		                       // this allows the functions inside waterfall to be reordered without issue.
+		vs['cameras'] = cameras;
+		return callback(null, vs);
+	    }
 	}
     });
 }
 
 
 function gotStream(stream) {
-    console.log("Gotstream " + stream.id);
     
     // create new video element
     var newvid = document.createElement('video');
@@ -241,8 +161,101 @@ function gotStream(stream) {
     //activeCam.number 
 }
 
-function snapshot(camera) {
+function scanLoop(vs, callback) {
 
+
+    //if (!vs.scan) vs['scan'] = true;
+    
+    takeSnapshots(vs, function(err) {
+	if (err) console.log(err);
+	scanLoop(vs, callback);
+	//callback(null, vs);
+    });
+}
+
+	
+
+
+function takeSnapshot(camera, callback) {
+
+    // open stream,
+    // add stream to video#live,
+    // copy video frame to canvas#preview* (where * is camera index)
+    // close stream
+
+    // abort if this camera is live
+    //console.dir(camera);
+    if (camera.live == true) return callback(null);
+    
+    // get camera source id
+    id = camera.id;
+    
+    // get camera stream
+    startStream(id, function(stream) {
+	
+	// get scanner div
+	var scanDiv = document.getElementById('scanner');
+	
+	// create scanner video element
+	var scanVid = document.createElement('video');
+	
+	// set src of video element to camera stream
+	scanVid.src = webkitURL.createObjectURL(stream);
+	scanVid.autoplay = true;
+	
+	// add video element to scanner
+	scanner.appendChild(scanVid);
+	
+	var camNum = camera.num;
+	var id = 'preview' + camNum;
+
+	var canvas = document.getElementById(id);
+	canvas.style.border='3px dotted red';
+	
+	// wait 1s for camera to init
+	setTimeout(function() {
+	    
+	    // send snapshot to .preview + i
+	    // @todo get aspect ratio, scale preview thumbnail accordingly
+	    canvas.style.border='3px solid blue';
+	    
+	    var ctx = canvas.getContext("2d");
+	    ctx.drawImage(scanVid, 0, 0, 480, 360, 0, 0, 150, 84);
+	    
+	    // close camera stream
+	    stream.stop();
+	    
+	    // remove the video element from the scanner div
+	    scanDiv.removeChild(scanVid);
+	    
+	    // the scan of this camera is finished
+	    callback(null);
+	    
+	}, initDelay);
+    });
+}
+
+function takeSnapshots(vs, callback) {
+    async.eachSeries(
+	vs.cameras,
+	takeSnapshot,
+
+	// function(err, result) {
+	//     if (err) console.log(err);
+	//     console.log(result);
+
+	//}),
+        function(err) {
+	    if (err) throw err;
+	    callback(null);
+	});
+
+
+	// if number of camera callbacks equals
+	// total number of cameras
+	// callback
+	//if (
+	//callback(null, vs)
 }
 
 function scanCams() {
@@ -250,7 +263,6 @@ function scanCams() {
 	console.log('scanning camera ' + scanCam);
 	
 	// close stream to last camera
-	console.dir(activeCam.stream);
 	activeCam.stream.stop();
 	
 	// open stream from new camera
@@ -260,7 +272,6 @@ function scanCams() {
 	// take snapshot
 	setTimeout(snapshot, initDelay);
 	
-
     }, scanInterval);
 }				
 
