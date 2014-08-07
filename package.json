@@ -15,6 +15,7 @@
   "dependencies": {
     "express": "^4.7.2",
     "mocha": "^1.21.3",
+    "nconf": "^0.6.9",
     "supertest": "^0.13.0"
   }
 }
