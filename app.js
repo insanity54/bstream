@@ -34,3 +34,5 @@ console.log('listening on port ' + nconf.get('PORT'));
 
 server.listen(nconf.get('PORT'));
 
+
+module.exports = app;
