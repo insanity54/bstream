@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html>
 <head>
@@ -44,13 +43,14 @@ var initDelay = 1000;
 
 <div id="previews">
     <p>Previews</p>
+    <!-- camera preview images go here -->    
 </div>
 
 <div id="scanner"></div>
 
 <div id="live">
-  <!-- camera preview images go here -->
     <p>Live</p>
+    <!-- the live camera video goes here -->
 </div>
 <br>
 
@@ -62,26 +62,82 @@ function failure(e) {
   alert(e.name)
 }
 
+function onPreviewClick(event, camera) {
+    
+    // if the camera is already live, abort.
+    console.log('camera preview clicked:');
+    console.dir(event);
+    if (camera.live == true) return;
+
+
+    
+    // set the camera live
+    camera.live = true;
+
+
+    
+    
+    // get camera source id
+    id = camera.id;
+    
+    // get camera stream
+    startStream(id, function(stream) {
+	
+	// get live video 
+	var liveDiv = document.getElementById('live');
+	
+	// create live video element
+	var liveVid = document.createElement('video');
+	
+	// set src of video element to camera stream
+	liveVid.src = webkitURL.createObjectURL(stream);
+	liveVid.autoplay = true;
+	
+	// add video element to scanner
+	liveDiv.appendChild(liveVid);
+
+	// get the camera number
+	var camNum = camera.num;
+
+	// find the id of this camera's previw div
+	var id = 'preview' + camNum;
+
+	// set the preview div border purple
+	var preview = document.getElementById(id);
+	preview.style.border='3px solid purple';
+	
+    });    
+    
+}
+
 function createPreview(camera, callback) {
     
     var camNum = camera.num;
 	
     // In the previews section, display a placeholder box for each detected camera
     preview = document.createElement('canvas');
+    preview.addEventListener('click', function(e) { onPreviewClick(e, camera) }, false);
     preview.setAttribute('width', '150');
     preview.setAttribute('height', '84');    
     preview.setAttribute('class', 'preview');
     preview.setAttribute('id', 'preview' + camNum);
     previews.appendChild(preview);
+    console.log('previews created');
     return callback();
 	
 }
 
 function createPreviews(vs, callback) {
     // for each camera, create a preview window
-    async.eachSeries(vs.cameras, createPreview, callback(null, vs));
+    console.log('create previews vs: ' + vs);
+    
+    async.eachSeries(
+	vs.cameras,
+	createPreview,
+	callback(null, vs)
+    );
 }
-	
+
 function start() {
 
     // make sure browser is supported
@@ -93,18 +149,40 @@ function start() {
     if (!navigator.getUserMedia) throw new Error('browser does not support getUserMedia.');
     if (!MediaStreamTrack.getSources) throw new Error('Browser does not support MediaStreamTrack.getsources(). Try Chrome.');
 
-
-    async.waterfall([
-	discoverCams,     // get video sources connected to this machine
-	createPreviews,   // for each video, create a preview canvas
+//    async.waterfall([
+//	discoverCams,     // get video sources connected to this machine
+//	createPreviews,   // for each video, create a preview canvas
+	
 	//takeSnapshots,
-	scanLoop
+//	scanLoop
 	//...
 	
-    ], function(err, results) {
-	console.log('waterfall done');
-	// called when all done, has all results of series functions
-    });	    
+//    ], function(err, results) {
+//	console.log('waterfall done');
+//	// called when all done, has all results of series functions
+//    });	            
+    main();
+}
+
+var main = function() {
+
+    //var cams;   // for holding all camera objects received from discoverCams
+    
+    var vs;
+    
+    discoverCams(function(err, vs) {
+	if (err) throw err;
+	console.log('discovered cameras. vs: ');
+	console.dir(vs);
+	//cams = vs.cameras;
+
+	createPreviews(vs, function(err, vs) {
+	    takeSnapshots(vs, function(err, result) {
+		if (err) throw err;
+		console.log(' snapshots taken. no errs.');
+	    });
+	});
+    });
 }
 
 function discoverCams(callback) {
@@ -136,7 +214,7 @@ function discoverCams(callback) {
 		if (!vs) var vs = {};  // create variables object used to hold all async.waterfall passed variables.
 		                       // this allows the functions inside waterfall to be reordered without issue.
 		vs['cameras'] = cameras;
-		return callback(null, vs);
+		callback(null, vs);
 	    }
 	}
     });
@@ -161,17 +239,48 @@ function gotStream(stream) {
     //activeCam.number 
 }
 
-function scanLoop(vs, callback) {
+function tco(f) {
+    var value;
+    var active = false;
+    var accumulated = [];
 
+    return function accumulator() {
+	accumulated.push(arguments);
 
-    //if (!vs.scan) vs['scan'] = true;
-    
-    takeSnapshots(vs, function(err) {
+	if (!active) {
+	    active = true;
+	    while (accumulated.length) value = f.apply(this, accumulated.shift()) 
+	    active = false;
+	    return value;
+
+	}
+    }
+}
+	    
+var scanLoop2 = function scanLoop2(callback) {
+    takeSnapShots(vs, function(err) {
 	if (err) console.log(err);
-	scanLoop(vs, callback);
-	//callback(null, vs);
+	callback(null);
     });
 }
+
+
+
+// var scanLoop = tco(function(vs, callback) {
+
+//     var vs;
+    
+
+	
+		  
+//     //vs, callback)
+//     //if (!vs.scan) vs['scan'] = true;
+//     takeSnapshots(vs, function(err) {
+// 	if (err) console.log(err);
+// 	scanLoop(vs, callback);
+// 	//callback(null, vs);
+//     });
+// })
 
 	
 
@@ -208,7 +317,8 @@ function takeSnapshot(camera, callback) {
 	
 	var camNum = camera.num;
 	var id = 'preview' + camNum;
-
+	console.log('id:' + id);
+	
 	var canvas = document.getElementById(id);
 	canvas.style.border='3px dotted red';
 	
@@ -229,33 +339,32 @@ function takeSnapshot(camera, callback) {
 	    scanDiv.removeChild(scanVid);
 	    
 	    // the scan of this camera is finished
-	    callback(null);
+	    return callback(null);
 	    
 	}, initDelay);
     });
 }
 
 function takeSnapshots(vs, callback) {
-    async.eachSeries(
-	vs.cameras,
-	takeSnapshot,
 
-	// function(err, result) {
-	//     if (err) console.log(err);
-	//     console.log(result);
+    console.log('takeSnapshots function. vs equals: ' + vs);
+    console.dir(vs);
+    
+    async.forever(
+	function keepLooping(next) {
+	    async.eachSeries(
+		vs,
+		takeSnapshot,
+		next
+	    );
+	},
 
-	//}),
-        function(err) {
-	    if (err) throw err;
-	    callback(null);
-	});
-
-
-	// if number of camera callbacks equals
-	// total number of cameras
-	// callback
-	//if (
-	//callback(null, vs)
+	function loopErrored(err) {
+	    console.log('THERE WAS ERROR: ' + err);
+	    
+	}
+    );
+    
 }
 
 function scanCams() {
