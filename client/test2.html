@@ -35,11 +35,10 @@ var initDelay = 1000;
 
 </script>
 </head>
-<body onload="start()">
-<!--
-<button id="btn" onclick="another()">Please may I have another?</button>
-<button id="snap" onclick="snapshot()">snapshot</button>
--->
+<!--<body onload="start()">-->
+<body>
+<button id="btn" onclick="start()">Please may I have another?</button>
+<button id="btn-stop" onclick="stop()">I DINT MEAN IT</button>
 
 <div id="previews">
     <p>Previews</p>
@@ -56,6 +55,7 @@ var initDelay = 1000;
 
 <script>
 
+var stopnao = false;
 
 function failure(e) {
   console.log("Failure");
@@ -136,6 +136,11 @@ function createPreviews(vs, callback) {
 	createPreview,
 	callback(null, vs)
     );
+}
+
+function stop() {
+    // stop the thingy
+    stopnao = true;
 }
 
 function start() {
@@ -339,9 +344,11 @@ function takeSnapshot(camera, callback) {
 	    scanDiv.removeChild(scanVid);
 	    
 	    // the scan of this camera is finished
-	    return callback(null);
+	    //return callback(null);
 	    
 	}, initDelay);
+	if (stopnao) return callback('it button told me to stop');
+	return callback(null);
     });
 }
 
@@ -352,8 +359,9 @@ function takeSnapshots(vs, callback) {
     
     async.forever(
 	function keepLooping(next) {
+	    console.log('> keeplooping');
 	    async.eachSeries(
-		vs,
+		vs.cameras,
 		takeSnapshot,
 		next
 	    );
@@ -367,22 +375,22 @@ function takeSnapshots(vs, callback) {
     
 }
 
-function scanCams() {
-    var scanTimer = setInterval(function() {
-	console.log('scanning camera ' + scanCam);
+// function scanCams() {
+//     var scanTimer = setInterval(function() {
+// 	console.log('scanning camera ' + scanCam);
 	
-	// close stream to last camera
-	activeCam.stream.stop();
+// 	// close stream to last camera
+// 	activeCam.stream.stop();
 	
-	// open stream from new camera
-	var stream = startStream(camToId(nextScanCam()));
+// 	// open stream from new camera
+// 	var stream = startStream(camToId(nextScanCam()));
 	
-	// wait for camera to init
-	// take snapshot
-	setTimeout(snapshot, initDelay);
+// 	// wait for camera to init
+// 	// take snapshot
+// 	setTimeout(snapshot, initDelay);
 	
-    }, scanInterval);
-}				
+//     }, scanInterval);
+// }				
 
 function startStream(id, callback) {
     navigator.getUserMedia({ video: {optional: [{sourceId: id}]}},
